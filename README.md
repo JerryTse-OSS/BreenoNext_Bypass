@@ -8,6 +8,10 @@ It is a LSPosed module for bypass Xiaobu Next beta verify
 4. Force-stop Xiaobu Next and restart it.
 5. Enjoy!
 
+# Features
+1. Bypassed Beta Verification in 170066 & higher version
+2. Added Custom LLM API using support 
+
 # FAQ
 
 **Q: Where can I get Xiaobu Next?**  
