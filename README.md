@@ -9,8 +9,7 @@ It is a LSPosed module for bypass Xiaobu Next beta verify
 5. Enjoy!
 
 # Features
-1. Bypassed Beta Verification in 170066 & higher version
-2. Added Custom LLM API using support 
+- Bypassed Beta Verification in 170066 & higher version
 
 # FAQ
 
