@@ -1,208 +1,270 @@
 package com.next.bypass;
 
 import android.content.Context;
-import android.content.pm.PackageInfo;
+
+import java.lang.reflect.Method;
+import java.util.concurrent.atomic.AtomicReference;
 
 import de.robv.android.xposed.IXposedHookLoadPackage;
 import de.robv.android.xposed.XC_MethodHook;
+import de.robv.android.xposed.XC_MethodReplacement;
 import de.robv.android.xposed.XposedBridge;
 import de.robv.android.xposed.XposedHelpers;
 import de.robv.android.xposed.callbacks.XC_LoadPackage;
-
-import java.util.ArrayList;
-import java.util.List;
 
 public class HookEntry implements IXposedHookLoadPackage {
 
     private static final String TARGET = "com.oplus.claw";
     private static final String TAG = "BreenoNextBypass";
 
+    private ClassLoader cl;
+
     @Override
     public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lpparam) {
         if (!lpparam.packageName.equals(TARGET)) return;
-        ClassLoader cl = lpparam.classLoader;
+        cl = lpparam.classLoader;
         XposedBridge.log(TAG + ": Loaded into " + TARGET);
 
-        hookRootDetection(cl);
-        hookRootChecker(cl);
-        hookBootloaderCheck(cl);
-        hookViewModelRootCheck(cl);
-        hookPrecheckBypass(cl);
-        hookCachedDecision(cl);
-        hookHttpResponse(cl);
-        hookStreamError(cl);
+        hookAccessGate();
+        hookN2PolicyState();
+        hookRootDetection();
+        hookBetaVerification();
+        hookBootloaderCheck();
+        hookViewModelRootCheck();
+        hookPrecheckBypass();
+        hookCachedDecision();
     }
 
-    private void hookRootDetection(ClassLoader cl) {
+    // ==================== Access Gate Bypass ====================
+
+    private void hookAccessGate() {
+        boolean dHooked = tryHook("com.oplus.claw.welcome.k3", "d",
+                String.class, XC_MethodReplacement.DO_NOTHING);
+        XposedBridge.log(TAG + ": hookAccessGate k3.d(String) — " + (dHooked ? "OK" : "FAILED"));
+
         try {
-            XposedHelpers.findAndHookMethod(
-                    XposedHelpers.findClass("aq.e6", cl), "f",
-                    new XC_MethodHook() {
-                        @Override
-                        protected void beforeHookedMethod(MethodHookParam param) {
-                            param.setResult(false);
-                            XposedBridge.log(TAG + ": Bypassed root detection (e6.f)");
-                        }
-                    });
-        } catch (Throwable ignored) {
-            try {
-                XposedHelpers.findAndHookMethod(
-                        XposedHelpers.findClass("com.oplus.anim.w", cl), "e",
+            final Class<?> h2Class = XposedHelpers.findClass("com.oplus.claw.welcome.h2", cl);
+            Object inMemoryGranted = findStaticField("com.oplus.claw.welcome.i2", "a");
+            if (inMemoryGranted == null) inMemoryGranted = findStaticField("com.oplus.claw.welcome.i2", "f15306a");
+            if (inMemoryGranted != null) {
+                final Object src = inMemoryGranted;
+                boolean fHooked = tryHook("com.oplus.claw.welcome.k3", "f",
                         new XC_MethodHook() {
                             @Override
                             protected void beforeHookedMethod(MethodHookParam param) {
-                                param.setResult(false);
-                                XposedBridge.log(TAG + ": Bypassed root detection (anim.w.e)");
+                                param.setResult(XposedHelpers.newInstance(h2Class,
+                                        src, Long.valueOf(System.currentTimeMillis())));
                             }
                         });
-            } catch (Throwable e) {
-                XposedBridge.log(TAG + ": Failed to hook root detection — " + e.getMessage());
+                XposedBridge.log(TAG + ": hookAccessGate k3.f() → Allowed — " + (fHooked ? "OK" : "FAILED"));
+            } else {
+                XposedBridge.log(TAG + ": hookAccessGate i2.a not found");
             }
-        }
-    }
-
-    private void hookRootChecker(ClassLoader cl) {
-        try {
-            XposedHelpers.findAndHookMethod(
-                    XposedHelpers.findClass("com.oplus.claw.welcome.k4", cl), "b",
-                    String.class, boolean.class,
-                    XposedHelpers.findClass("g20.a", cl),
-                    XposedHelpers.findClass("y20.y", cl),
-                    XposedHelpers.findClass("x10.c", cl),
-                    new XC_MethodHook() {
-                        @Override
-                        protected void beforeHookedMethod(MethodHookParam param) {
-                            param.setResult(false);
-                            XposedBridge.log(TAG + ": Bypassed root checker (k4.b)");
-                        }
-                    });
-        } catch (Throwable ignored) {
-        }
-    }
-
-    private void hookBootloaderCheck(ClassLoader cl) {
-        try {
-            XposedHelpers.findAndHookMethod(
-                    XposedHelpers.findClass("com.oplus.claw.welcome.s4", cl), "i",
-                    Context.class,
-                    new XC_MethodHook() {
-                        @Override
-                        protected void beforeHookedMethod(MethodHookParam param) {
-                            param.setResult(false);
-                            XposedBridge.log(TAG + ": Bypassed bootloader check (s4.i)");
-                        }
-                    });
         } catch (Throwable e) {
-            XposedBridge.log(TAG + ": Failed to hook s4.i — " + e.getMessage());
+            XposedBridge.log(TAG + ": hookAccessGate k3.f() error — " + e.getMessage());
         }
     }
 
-    private void hookViewModelRootCheck(ClassLoader cl) {
-        try {
-            XposedHelpers.findAndHookMethod(
-                    XposedHelpers.findClass("com.oplus.claw.welcome.m1", cl), "f",
-                    String.class, XposedHelpers.findClass("x10.c", cl),
-                    new XC_MethodHook() {
-                        @Override
-                        protected void beforeHookedMethod(MethodHookParam param) {
-                            param.setResult(null);
-                            XposedBridge.log(TAG + ": Bypassed ViewModel root check (m1.f)");
-                        }
-                    });
-        } catch (Throwable e) {
-            XposedBridge.log(TAG + ": Failed to hook m1.f — " + e.getMessage());
-        }
-    }
+    // ==================== N2 Policy State Bypass ====================
 
-    private void hookPrecheckBypass(ClassLoader cl) {
+    private void hookN2PolicyState() {
         try {
-            final Class<?> e1 = XposedHelpers.findClass("com.oplus.claw.welcome.e1", cl);
-            XposedHelpers.findAndHookMethod(
-                    XposedHelpers.findClass("com.oplus.claw.welcome.m1", cl), "h",
-                    boolean.class, boolean.class, String.class, boolean.class,
-                    XposedHelpers.findClass("x10.c", cl),
-                    new XC_MethodHook() {
-                        @Override
-                        protected void beforeHookedMethod(MethodHookParam param) {
-                            param.setResult(XposedHelpers.newInstance(e1));
-                            XposedBridge.log(TAG + ": Bypassed /precheck (m1.h)");
-                        }
-                    });
-        } catch (Throwable e) {
-            XposedBridge.log(TAG + ": Failed to hook m1.h — " + e.getMessage());
-        }
-    }
-
-    private void hookCachedDecision(ClassLoader cl) {
-        try {
-            final Class<?> h2 = XposedHelpers.findClass("com.oplus.claw.welcome.h2", cl);
-            XC_MethodHook handler = new XC_MethodHook() {
+            Object n2RefObj = findStaticField("com.oplus.claw.welcome.n2", "b");
+            if (n2RefObj == null) n2RefObj = findStaticField("com.oplus.claw.welcome.n2", "f15415b");
+            if (n2RefObj == null) {
+                XposedBridge.log(TAG + ": hookN2PolicyState — n2.b not found");
+                return;
+            }
+            final Object n2Ref = n2RefObj;
+            final Class<?> k2Class = findClass("com.oplus.claw.welcome.k2");
+            Object pendingObj = XposedHelpers.getStaticObjectField(k2Class, "a");
+            if (pendingObj == null) pendingObj = XposedHelpers.getStaticObjectField(k2Class, "f15329a");
+            final Object pending = pendingObj;
+            Method setMethod = AtomicReference.class.getDeclaredMethod("set", Object.class);
+            XposedBridge.hookMethod(setMethod, new XC_MethodHook() {
                 @Override
                 protected void beforeHookedMethod(MethodHookParam param) {
-                    param.setResult(XposedHelpers.newInstance(h2,
+                    if (param.thisObject != n2Ref) return;
+                    Object l2Obj = param.args[0];
+                    if (l2Obj == null) return;
+                    boolean enforced = getBoolField(l2Obj, "a", "f15357a");
+                    Object verdict = getObjField(l2Obj, "c", "f15359c");
+                    if (enforced && verdict == pending) {
+                        param.setResult(null);
+                        XposedBridge.log(TAG + ": Blocked n2 policy → enforced+pending");
+                    }
+                }
+            });
+            XposedBridge.log(TAG + ": hookN2PolicyState — OK");
+        } catch (Throwable e) {
+            XposedBridge.log(TAG + ": hookN2PolicyState error — " + e.getMessage());
+        }
+    }
+
+    // ==================== Root Detection Bypass ====================
+
+    private void hookRootDetection() {
+        XC_MethodHook hook = setResultHook(false);
+        if (tryHook("ap.b", "g", hook)) return;
+        if (tryHook("aq.e6", "f", hook)) return;
+        tryHook("com.oplus.anim.w", "e", hook);
+    }
+
+    // ==================== Beta Verify Bypass ====================
+
+    private void hookBetaVerification() {
+        XC_MethodHook hook = setResultHook(false);
+        // 170069
+        if (tryHookParams("com.oplus.claw.welcome.n2", "b",
+                String.class, Boolean.class,
+                findClass("n20.a"), findClass("f30.x"), findClass("e20.c"), hook)) return;
+        // 170068 / 170066
+        tryHookParams("com.oplus.claw.welcome.k4", "b",
+                String.class, boolean.class,
+                findClass("g20.a"), findClass("y20.y"), findClass("x10.c"), hook);
+    }
+
+    // ==================== Bootloader Bypass ====================
+
+    private void hookBootloaderCheck() {
+        XC_MethodHook hook = setResultHook(false);
+        if (tryHook("com.oplus.claw.welcome.w4", "i", Context.class, hook)) return;
+        if (tryHook("com.oplus.claw.welcome.s4", "i", Context.class, hook)) return;
+        tryHook("com.oplus.anim.w", "e", hook);
+    }
+
+    // ==================== ViewModel root Bypass ====================
+
+    private void hookViewModelRootCheck() {
+        XC_MethodHook hook = setResultHook((Object) null);
+        if (tryHookParams("com.oplus.claw.welcome.n1", "f",
+                String.class, findClass("e20.c"), hook)) return;
+        tryHookParams("com.oplus.claw.welcome.m1", "f",
+                String.class, findClass("x10.c"), hook);
+    }
+
+    // ==================== /precheck Bypass ====================
+
+    private void hookPrecheckBypass() {
+        Object e1 = findStaticField("com.oplus.claw.welcome.e1", "f15227a");
+        if (e1 == null) e1 = findStaticField("com.oplus.claw.welcome.e1", "a");
+        if (e1 == null) {
+            XposedBridge.log(TAG + ": hookPrecheckBypass — e1 not found");
+            return;
+        }
+        final Object idle = e1;
+        XC_MethodHook hook = new XC_MethodHook() {
+            @Override
+            protected void beforeHookedMethod(MethodHookParam param) {
+                param.setResult(idle);
+            }
+        };
+        if (tryHookParams("com.oplus.claw.welcome.n1", "h",
+                boolean.class, boolean.class, String.class, boolean.class,
+                findClass("e20.c"), hook)) return;
+        tryHookParams("com.oplus.claw.welcome.m1", "h",
+                boolean.class, boolean.class, String.class, boolean.class,
+                findClass("x10.c"), hook);
+    }
+
+    // ==================== Cached Decision Bypass ====================
+
+    private void hookCachedDecision() {
+        try {
+            final Class<?> o2Class = XposedHelpers.findClass("com.oplus.claw.welcome.o2", cl);
+            XC_MethodHook hook = new XC_MethodHook() {
+                @Override
+                protected void beforeHookedMethod(MethodHookParam param) {
+                    param.setResult(XposedHelpers.newInstance(o2Class,
                             System.currentTimeMillis(), "", "", true));
-                    XposedBridge.log(TAG + ": Cached decision -> Allowed");
                 }
             };
-            try {
-                XposedHelpers.findAndHookMethod(
-                        XposedHelpers.findClass("com.oplus.claw.welcome.p", cl), "b",
-                        Context.class, handler);
-            } catch (Throwable ignored) {
-                XposedHelpers.findAndHookMethod(
-                        XposedHelpers.findClass("com.oplus.claw.welcome.o", cl), "b",
-                        Context.class, handler);
+            if (tryHook("com.oplus.claw.welcome.p", "b", Context.class, hook)) return;
+        } catch (Throwable e) {
+            XposedBridge.log(TAG + ": hookCachedDecision 170069 error — " + e.getMessage());
+        }
+        try {
+            final Class<?> h2Old = XposedHelpers.findClass("com.oplus.claw.welcome.h2", cl);
+            XC_MethodHook hook = new XC_MethodHook() {
+                @Override
+                protected void beforeHookedMethod(MethodHookParam param) {
+                    param.setResult(XposedHelpers.newInstance(h2Old,
+                            System.currentTimeMillis(), "", "", true));
+                }
+            };
+            if (tryHook("com.oplus.claw.welcome.p", "b", Context.class, hook)) return;
+            if (tryHook("com.oplus.claw.welcome.o", "b", Context.class, hook)) return;
+        } catch (Throwable ignored) {
+        }
+        XposedBridge.log(TAG + ": hookCachedDecision — all attempts failed");
+    }
+
+    // ==================== Misc for Hook ====================
+
+    private boolean tryHook(String className, String methodName, XC_MethodHook hook) {
+        try {
+            XposedHelpers.findAndHookMethod(findClass(className), methodName, hook);
+            XposedBridge.log(TAG + ": Hooked " + className + "." + methodName);
+            return true;
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private boolean tryHook(String className, String methodName,
+                            Class<?> p1, XC_MethodHook hook) {
+        try {
+            XposedHelpers.findAndHookMethod(findClass(className), methodName, p1, hook);
+            XposedBridge.log(TAG + ": Hooked " + className + "." + methodName);
+            return true;
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private boolean tryHookParams(String className, String methodName,
+                                  Object... paramTypesAndCallback) {
+        try {
+            XposedHelpers.findAndHookMethod(findClass(className), methodName, paramTypesAndCallback);
+            XposedBridge.log(TAG + ": Hooked " + className + "." + methodName);
+            return true;
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private Class<?> findClass(String name) {
+        return XposedHelpers.findClass(name, cl);
+    }
+
+    private Object findStaticField(String className, String fieldName) {
+        try {
+            return XposedHelpers.getStaticObjectField(findClass(className), fieldName);
+        } catch (Throwable e) {
+            return null;
+        }
+    }
+
+    private static boolean getBoolField(Object obj, String name1, String name2) {
+        try { return XposedHelpers.getBooleanField(obj, name1); }
+        catch (Throwable ignored) {}
+        try { return XposedHelpers.getBooleanField(obj, name2); }
+        catch (Throwable ignored) { return false; }
+    }
+
+    private static Object getObjField(Object obj, String name1, String name2) {
+        try { return XposedHelpers.getObjectField(obj, name1); }
+        catch (Throwable ignored) {}
+        try { return XposedHelpers.getObjectField(obj, name2); }
+        catch (Throwable ignored) { return null; }
+    }
+
+    private static XC_MethodHook setResultHook(final Object value) {
+        return new XC_MethodHook() {
+            @Override
+            protected void beforeHookedMethod(MethodHookParam param) {
+                param.setResult(value);
             }
-        } catch (Throwable e) {
-            XposedBridge.log(TAG + ": Failed to hook cached decision — " + e.getMessage());
-        }
-    }
-
-    private void hookHttpResponse(ClassLoader cl) {
-        try {
-            final Class<?> e4 = XposedHelpers.findClass("com.oplus.claw.welcome.e4", cl);
-            XposedHelpers.findAndHookMethod(
-                    XposedHelpers.findClass("com.oplus.claw.welcome.u2", cl), "e",
-                    e4, String.class, String.class, boolean.class,
-                    new XC_MethodHook() {
-                        @Override
-                        protected void beforeHookedMethod(MethodHookParam param) {
-                            Object resp = param.args[0];
-                            Object msgObj = XposedHelpers.getObjectField(resp, "b");
-                            if (!(msgObj instanceof String)) return;
-                            String msg = (String) msgObj;
-                            if (msg.contains("-12002") || msg.contains("-12003")) {
-                                XposedHelpers.setObjectField(resp, "b", "{\"code\":0,\"message\":\"ok\"}");
-                                XposedHelpers.setIntField(resp, "a", 200);
-                                XposedHelpers.setBooleanField(resp, "c", true);
-                                XposedBridge.log(TAG + ": Stripped -12002/-12003 from HTTP response (u2.e)");
-                            }
-                        }
-                    });
-        } catch (Throwable e) {
-            XposedBridge.log(TAG + ": Failed to hook u2.e — " + e.getMessage());
-        }
-    }
-
-    private void hookStreamError(ClassLoader cl) {
-        try {
-            XposedHelpers.findAndHookMethod(
-                    XposedHelpers.findClass("si.f0", cl), "b",
-                    String.class,
-                    new XC_MethodHook() {
-                        @Override
-                        protected void afterHookedMethod(MethodHookParam param) {
-                            Object result = param.getResult();
-                            if (result == null) return;
-                            Object codeObj = XposedHelpers.getObjectField(result, "c");
-                            if ("-12002".equals(codeObj) || "-12003".equals(codeObj)) {
-                                param.setResult(null);
-                                XposedBridge.log(TAG + ": Suppressed -12002/-12003 stream error (f0.b)");
-                            }
-                        }
-                    });
-        } catch (Throwable e) {
-            XposedBridge.log(TAG + ": Failed to hook si.f0.b — " + e.getMessage());
-        }
+        };
     }
 }
