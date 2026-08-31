@@ -15,7 +15,7 @@ import de.robv.android.xposed.callbacks.XC_LoadPackage;
 /**
  * Xposed module to bypass verification checks in BreenoNext (com.oplus.claw).
  *
- * Supported versions: 170066, 170068, 170069, 170070
+ * Supported versions: 170066, 170068, 170069, 170070, 170071
  *
  * Each version uses different obfuscated class names but shares the same logic.
  * Version detection is done by checking which gate controller class exists.
@@ -33,6 +33,7 @@ public class HookEntry implements IXposedHookLoadPackage {
     private static final int V170068 = 170068;
     private static final int V170069 = 170069;
     private static final int V170070 = 170070;
+    private static final int V170071 = 170071;
 
     @Override
     public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lpparam) {
@@ -60,21 +61,20 @@ public class HookEntry implements IXposedHookLoadPackage {
      * Detect app version by checking which gate controller class exists.
      *
      * The gate controller is the class with d(String) (Denied) and e() (Granted) methods.
-     * - 170070: n3 is the controller
-     * - 170069: k3 is the controller
-     * - 170066/170068: c3 is the controller (distinguished by a0/b0 classes)
-     *
-     * Note: k3 and n3 exist in all versions as gate STATE classes,
-     * but only serve as controllers in their respective versions.
+     * - 170071: g3
+     * - 170070: n3
+     * - 170069: k3
+     * - 170066/170068: c3 (distinguished by a0/b0 classes)
      */
     private int detectVersion() {
-        // Check if n3 has d(String) method → 170070
+        // 170071: g3 is the controller
+        if (hasMethod("com.oplus.claw.welcome.g3", "d", String.class)) return V170071;
+        // 170070: n3 is the controller
         if (hasMethod("com.oplus.claw.welcome.n3", "d", String.class)) return V170070;
-        // Check if k3 has d(String) method → 170069
+        // 170069: k3 is the controller
         if (hasMethod("com.oplus.claw.welcome.k3", "d", String.class)) return V170069;
-        // c3 is the controller in 170066/170068
+        // 170066/170068: c3 is the controller
         if (hasMethod("com.oplus.claw.welcome.c3", "d", String.class)) {
-            // Distinguish by unique classes: 170066 has a0, 170068 has b0
             if (classExists("com.oplus.claw.welcome.a0")) return V170066;
             return V170068;
         }
@@ -95,18 +95,33 @@ public class HookEntry implements IXposedHookLoadPackage {
     }
 
     // ==================== Version-specific class getters ====================
-    // These methods return the correct obfuscated class/method names for each version.
 
     /**
      * Gate controller class that manages access state.
-     * - 170066/170068: c3 (d=Denied, e=Granted, f=not ready)
-     * - 170069: k3 (d=Denied, e=Granted, f=not ready)
-     * - 170070: n3 (d=Denied, e=Granted, f=not ready)
+     * - 170066/170068: c3
+     * - 170069: k3
+     * - 170070: n3
+     * - 170071: g3
      */
     private String gateControllerClass() {
         if (version <= V170068) return "c3";
         if (version == V170069) return "k3";
-        return "n3";
+        if (version == V170070) return "n3";
+        return "g3";
+    }
+
+    /**
+     * Granted state class with long constructor.
+     * - 170066/170068: z2(long)
+     * - 170069: h2(i2, Long)
+     * - 170070: k2(l2, Long)
+     * - 170071: d3(long)
+     */
+    private String grantedStateClass() {
+        if (version <= V170068) return "z2";
+        if (version == V170069) return "h2";
+        if (version == V170070) return "k2";
+        return "d3";
     }
 
     /**
@@ -114,11 +129,13 @@ public class HookEntry implements IXposedHookLoadPackage {
      * - 170066/170068: k4
      * - 170069: n2
      * - 170070: q2
+     * - 170071: k2
      */
     private String policyHolderClass() {
         if (version <= V170068) return "k4";
         if (version == V170069) return "n2";
-        return "q2";
+        if (version == V170070) return "q2";
+        return "k2";
     }
 
     /**
@@ -126,11 +143,13 @@ public class HookEntry implements IXposedHookLoadPackage {
      * - 170066/170068: h4
      * - 170069: k2
      * - 170070: n2
+     * - 170071: h2
      */
     private String verdictEnumClass() {
         if (version <= V170068) return "h4";
         if (version == V170069) return "k2";
-        return "n2";
+        if (version == V170070) return "n2";
+        return "h2";
     }
 
     /**
@@ -138,11 +157,13 @@ public class HookEntry implements IXposedHookLoadPackage {
      * - 170066/170068: s4
      * - 170069: w4
      * - 170070: z4
+     * - 170071: s4
      */
     private String bootCheckClass() {
         if (version <= V170068) return "s4";
         if (version == V170069) return "w4";
-        return "z4";
+        if (version == V170070) return "z4";
+        return "s4";
     }
 
     /**
@@ -150,11 +171,13 @@ public class HookEntry implements IXposedHookLoadPackage {
      * - 170066/170068: m1
      * - 170069: n1
      * - 170070: q1
+     * - 170071: k1
      */
     private String viewModelClass() {
         if (version <= V170068) return "m1";
         if (version == V170069) return "n1";
-        return "q1";
+        if (version == V170070) return "q1";
+        return "k1";
     }
 
     /**
@@ -162,11 +185,13 @@ public class HookEntry implements IXposedHookLoadPackage {
      * - 170066/170068: x10.c
      * - 170069: e20.c
      * - 170070: h20.c
+     * - 170071: y20.c
      */
     private String continuationClass() {
         if (version <= V170068) return "x10.c";
         if (version == V170069) return "e20.c";
-        return "h20.c";
+        if (version == V170070) return "h20.c";
+        return "y20.c";
     }
 
     /**
@@ -174,17 +199,20 @@ public class HookEntry implements IXposedHookLoadPackage {
      * - 170066/170068: c1.f17845a
      * - 170069: e1.f15227a
      * - 170070: f1.f15998a
+     * - 170071: b1.f17861a
      */
     private String idleStateClass() {
         if (version <= V170068) return "c1";
         if (version == V170069) return "e1";
-        return "f1";
+        if (version == V170070) return "f1";
+        return "b1";
     }
 
     private String idleStateField() {
         if (version <= V170068) return "f17845a";
         if (version == V170069) return "f15227a";
-        return "f15998a";
+        if (version == V170070) return "f15998a";
+        return "f17861a";
     }
 
     /**
@@ -192,11 +220,13 @@ public class HookEntry implements IXposedHookLoadPackage {
      * - 170066/170068: h2(long, String, String, boolean)
      * - 170069: o2(long, String, String, boolean)
      * - 170070: r2(long, String, String, boolean)
+     * - 170071: l2(long, String, String, boolean)
      */
     private String cachedDecisionClass() {
         if (version <= V170068) return "h2";
         if (version == V170069) return "o2";
-        return "r2";
+        if (version == V170070) return "r2";
+        return "l2";
     }
 
     /**
@@ -215,27 +245,12 @@ public class HookEntry implements IXposedHookLoadPackage {
             // 170069: n2.b(String, Boolean, n20.a, f30.x, e20.c)
             return new Object[]{String.class, Boolean.class, findClass("n20.a"), findClass("f30.x"), findClass(cont)};
         }
-        // 170070: q2.b(String, Boolean, q20.a, i30.x, h20.c)
-        return new Object[]{String.class, Boolean.class, findClass("q20.a"), findClass("i30.x"), findClass(cont)};
-    }
-
-    /**
-     * PolicyState field names for isEnforced and verdict.
-     * Returns [isEnforcedField, verdictField]
-     */
-    private String[] policyStateFields() {
-        if (version <= V170068) return new String[]{"a", "c"};
-        if (version == V170069) return new String[]{"a", "c"};
-        return new String[]{"a", "c"};
-    }
-
-    /**
-     * AtomicReference field name in policy holder (usually 'b' or obfuscated).
-     */
-    private String policyRefField() {
-        if (version <= V170068) return "b";
-        if (version == V170069) return "b";
-        return "b";
+        if (version == V170070) {
+            // 170070: q2.b(String, Boolean, q20.a, i30.x, h20.c)
+            return new Object[]{String.class, Boolean.class, findClass("q20.a"), findClass("i30.x"), findClass(cont)};
+        }
+        // 170071: k2.b(String, Boolean, h30.a, z30.x, y20.c)
+        return new Object[]{String.class, Boolean.class, findClass("h30.a"), findClass("z30.x"), findClass(cont)};
     }
 
     // ==================== Hook implementations ====================
@@ -280,6 +295,7 @@ public class HookEntry implements IXposedHookLoadPackage {
      * - 170066/170068: z2(long) extends b3
      * - 170069: h2(i2, Long) extends g2
      * - 170070: k2(l2, Long) extends m2
+     * - 170071: d3(long) extends f3
      */
     private Object createReadyState() {
         try {
@@ -308,6 +324,11 @@ public class HookEntry implements IXposedHookLoadPackage {
                             .newInstance(src, System.currentTimeMillis());
                 }
             }
+            if (version == V170071) {
+                // 170071: d3(long) is the Granted state
+                Class<?> d3Class = XposedHelpers.findClass("com.oplus.claw.welcome.d3", cl);
+                return d3Class.getConstructor(long.class).newInstance(System.currentTimeMillis());
+            }
         } catch (Throwable e) {
             XposedBridge.log(TAG + ": createReadyState error — " + e.getMessage());
         }
@@ -330,7 +351,7 @@ public class HookEntry implements IXposedHookLoadPackage {
             String verdict = "com.oplus.claw.welcome." + verdictEnumClass();
 
             // Find the AtomicReference holding the policy state
-            Object refObj = findStaticField(holder, policyRefField());
+            Object refObj = findStaticField(holder, "b");
             if (refObj == null) {
                 XposedBridge.log(TAG + ": hookPolicyState — ref not found in " + holder);
                 return;
@@ -376,6 +397,7 @@ public class HookEntry implements IXposedHookLoadPackage {
      * We try multiple known classes as fallback.
      *
      * Hook points (tried in order):
+     * - 170071: as.b.g()
      * - 170070: az.b.e()
      * - 170069: ap.b.g()
      * - 170068: com.oplus.anim.w.e()
@@ -384,7 +406,9 @@ public class HookEntry implements IXposedHookLoadPackage {
     private void hookRootDetection() {
         XC_MethodHook hook = setResultHook(false);
 
-        // Try version-specific class first, then fallback to others
+        if (version >= V170071) {
+            if (tryHook("as.b", "g", hook)) return;
+        }
         if (version >= V170070) {
             if (tryHook("az.b", "e", hook)) return;
         }
@@ -394,7 +418,6 @@ public class HookEntry implements IXposedHookLoadPackage {
         if (version >= V170068) {
             if (tryHook("com.oplus.anim.w", "e", hook)) return;
         }
-        // 170066 fallback
         tryHook("aq.e6", "f", hook);
     }
 
@@ -408,6 +431,7 @@ public class HookEntry implements IXposedHookLoadPackage {
      * - 170068: k4.b(String, Boolean, g20.a, y20.y, x10.c)
      * - 170069: n2.b(String, Boolean, n20.a, f30.x, e20.c)
      * - 170070: q2.b(String, Boolean, q20.a, i30.x, h20.c)
+     * - 170071: k2.b(String, Boolean, h30.a, z30.x, y20.c)
      */
     private void hookBetaVerification() {
         String cls = "com.oplus.claw.welcome." + policyHolderClass();
@@ -429,6 +453,7 @@ public class HookEntry implements IXposedHookLoadPackage {
      * - 170066/170068: s4.i(Context)
      * - 170069: w4.i(Context)
      * - 170070: z4.i(Context)
+     * - 170071: s4.i(Context)
      */
     private void hookBootloaderCheck() {
         String cls = "com.oplus.claw.welcome." + bootCheckClass();
@@ -445,6 +470,7 @@ public class HookEntry implements IXposedHookLoadPackage {
      * - 170066/170068: m1.f(String, x10.c)
      * - 170069: n1.f(String, e20.c)
      * - 170070: q1.f(String, h20.c)
+     * - 170071: k1.f(String, y20.c)
      */
     private void hookViewModelRootCheck() {
         String cls = "com.oplus.claw.welcome." + viewModelClass();
@@ -462,6 +488,7 @@ public class HookEntry implements IXposedHookLoadPackage {
      * - 170066/170068: m1.h(boolean, boolean, String, boolean, x10.c)
      * - 170069: n1.h(boolean, boolean, String, boolean, e20.c)
      * - 170070: q1.h(boolean, boolean, String, boolean, h20.c)
+     * - 170071: k1.h(boolean, boolean, String, boolean, y20.c)
      */
     private void hookPrecheckBypass() {
         Object idle = findStaticField("com.oplus.claw.welcome." + idleStateClass(), idleStateField());
@@ -495,6 +522,7 @@ public class HookEntry implements IXposedHookLoadPackage {
      *   - 170066/170068: h2(long, String, String, boolean)
      *   - 170069: o2(long, String, String, boolean)
      *   - 170070: r2(long, String, String, boolean)
+     *   - 170071: l2(long, String, String, boolean)
      */
     private void hookCachedDecision() {
         try {
